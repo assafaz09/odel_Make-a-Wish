@@ -1,0 +1,32 @@
+[
+  {
+    "id": "draw-likes",
+    "kind": "text",
+    "prompt": "אילו ציורים את אוהבת לצייר?"
+  },
+  {
+    "id": "drawing-file",
+    "kind": "file",
+    "prompt": "האם את יכולה לצרף קובץ של ציור?"
+  },
+  {
+    "id": "human-body",
+    "kind": "yes-no",
+    "prompt": "האם את יודעת לצייר גוף אדם?"
+  },
+  {
+    "id": "fashion-sketch",
+    "kind": "yes-no",
+    "prompt": "האם התנסית בעבר בציור סקיצות של אופנה?"
+  },
+  {
+    "id": "proportions",
+    "kind": "choice",
+    "prompt": "האם את מכירה את המושג ״פרופורציות״ בעיצוב?",
+    "choices": [
+      { "id": "yes", "label": "כן" },
+      { "id": "no", "label": "לא" },
+      { "id": "what", "label": "מה זה?:)" }
+    ]
+  }
+]
