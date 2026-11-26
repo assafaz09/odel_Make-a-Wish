@@ -51,15 +51,19 @@ select {
 
 .popup-runway {
   --lead: 0;
-  height: calc(100dvh * var(--popup-count, 3));
+  height: calc(100svh * var(--popup-count, 3));
   overflow-anchor: none;
+}
+
+.popup-runway--settled {
+  position: relative;
 }
 
 .popup-stage {
   position: sticky;
   top: 0;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100svh;
+  max-height: 100svh;
   overflow: clip;
   pointer-events: none;
   touch-action: pan-y;
@@ -67,6 +71,12 @@ select {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   background: #f4fcfd;
+}
+
+.popup-runway--settled .popup-stage {
+  position: absolute;
+  top: auto;
+  bottom: 0;
 }
 
 .popup-stack {
@@ -103,7 +113,7 @@ select {
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 -22px 40px rgba(15, 63, 76, 0.28);
   opacity: calc(var(--reveal) * (1 - var(--reveal)) * 4);
-  transform: translate3d(0, calc((1 - var(--reveal)) * var(--stage, 100dvh)), 0);
+  transform: translate3d(0, calc((1 - var(--reveal)) * var(--stage, 100svh)), 0);
 }
 
 .popup-card__scene {
@@ -372,7 +382,7 @@ select {
   .popup-card {
     position: relative;
     inset: auto;
-    height: 100dvh;
+    height: 100svh;
     clip-path: none;
     pointer-events: none;
   }

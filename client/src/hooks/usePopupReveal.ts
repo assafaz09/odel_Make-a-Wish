@@ -24,20 +24,29 @@ export function usePopupReveal(count: number) {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
     const metrics = { stageHeight: 0, travel: 0, start: 0 }
     let lastScrollY = Number.NaN
+    let settled: 'before' | 'inside' | 'after' | null = null
+    let lastWidth = window.visualViewport?.width ?? window.innerWidth
 
-    const measure = () => {
+    const measure = (force: boolean) => {
       const stageHeight = stage?.offsetHeight ?? 0
+      const travel = Math.max(runway.offsetHeight - stageHeight, 0)
+      const start = runway.getBoundingClientRect().top + window.scrollY
+      const heightChanged = stageHeight !== metrics.stageHeight || Math.abs(travel - metrics.travel) > 0.5
       metrics.stageHeight = stageHeight
-      metrics.travel = Math.max(runway.offsetHeight - stageHeight, 0)
-      metrics.start = runway.getBoundingClientRect().top + window.scrollY
+      metrics.travel = travel
+      metrics.start = start
       if (stageHeight > 0) {
         runway.style.setProperty('--stage', `${stageHeight}px`)
+      }
+      if (force || heightChanged) {
+        settled = null
+        lastScrollY = Number.NaN
       }
     }
 
     const apply = () => {
       const scrollY = window.scrollY
-      if (scrollY === lastScrollY) {
+      if (scrollY === lastScrollY && settled !== null) {
         return
       }
       lastScrollY = scrollY
@@ -46,6 +55,7 @@ export function usePopupReveal(count: number) {
       const cards = cardRefs.current
 
       if (reduced || count < 2 || metrics.stageHeight <= 0) {
+        runway.classList.remove('popup-runway--settled')
         for (let index = 0; index < count; index += 1) {
           const card = cards[index]
           if (!card) {
@@ -56,11 +66,20 @@ export function usePopupReveal(count: number) {
           card.setAttribute('aria-hidden', 'false')
         }
         runway.style.setProperty('--lead', '0')
+        settled = 'inside'
         return
       }
 
+      const raw = scrollY - metrics.start
+      const nextSettled = raw <= 0 ? 'before' : raw >= metrics.travel ? 'after' : 'inside'
+      if (nextSettled !== 'inside' && nextSettled === settled) {
+        return
+      }
+      settled = nextSettled
+      runway.classList.toggle('popup-runway--settled', nextSettled === 'after')
+
       const segment = metrics.travel / (count - 1)
-      const traveled = clamp(window.scrollY - metrics.start, 0, metrics.travel)
+      const traveled = clamp(raw, 0, metrics.travel)
       runway.style.setProperty('--lead', segment === 0 ? '0' : clamp(traveled / segment, 0, 1).toFixed(4))
 
       let front = 0
@@ -88,32 +107,45 @@ export function usePopupReveal(count: number) {
       }
     }
 
-    const onResize = () => {
-      lastScrollY = Number.NaN
-      measure()
+    const remeasure = (force: boolean) => {
+      measure(force)
       apply()
     }
 
-    measure()
-    apply()
+    const onWidthChange = () => {
+      const width = window.visualViewport?.width ?? window.innerWidth
+      if (Math.abs(width - lastWidth) < 1) {
+        return
+      }
+      lastWidth = width
+      remeasure(true)
+    }
 
-    const observer = new ResizeObserver(onResize)
+    remeasure(true)
+
+    const observer = new ResizeObserver(() => {
+      remeasure(false)
+    })
     observer.observe(runway)
     if (stage) {
       observer.observe(stage)
     }
 
+    const onMotionChange = () => {
+      remeasure(true)
+    }
+
     window.addEventListener('scroll', apply, { passive: true })
-    window.addEventListener('resize', onResize)
-    window.visualViewport?.addEventListener('resize', onResize)
-    motion.addEventListener('change', onResize)
+    window.addEventListener('resize', onWidthChange)
+    window.visualViewport?.addEventListener('resize', onWidthChange)
+    motion.addEventListener('change', onMotionChange)
 
     return () => {
       observer.disconnect()
       window.removeEventListener('scroll', apply)
-      window.removeEventListener('resize', onResize)
-      window.visualViewport?.removeEventListener('resize', onResize)
-      motion.removeEventListener('change', onResize)
+      window.removeEventListener('resize', onWidthChange)
+      window.visualViewport?.removeEventListener('resize', onWidthChange)
+      motion.removeEventListener('change', onMotionChange)
     }
   }, [count])
 
