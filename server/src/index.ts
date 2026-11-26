@@ -27,7 +27,10 @@ if (config.mongodbUri) {
   console.log('MongoDB is not configured. Questionnaire submissions will not be saved.')
 }
 
-const server = createServer(createApp(config))
+const app = createApp(config)
+const server = createServer(app)
+
+export default app
 
 server.on('error', (error: NodeJS.ErrnoException) => {
   if (error.code === 'EADDRINUSE') {
