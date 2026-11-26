@@ -1263,7 +1263,7 @@ select {
   overflow: hidden;
   background: var(--color-bg);
   touch-action: none;
-  animation: dog-scene 5500ms linear forwards;
+  animation: dog-scene 3000ms linear forwards;
 }
 
 .dog-scene__body {
