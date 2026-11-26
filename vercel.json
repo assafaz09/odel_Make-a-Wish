@@ -8,7 +8,8 @@
     "server": {
       "root": "server",
       "framework": "express",
-      "entrypoint": "src/index.ts"
+      "entrypoint": "src/index.ts",
+      "includeFiles": "../client/src/content/questions.json"
     }
   },
   "rewrites": [

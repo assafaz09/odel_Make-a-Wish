@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const TEXT_LIMIT = 2000
@@ -37,10 +36,7 @@ type CatalogQuestion = {
   prompt: string
 }
 
-const questionsPath = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../../../client/src/content/questions.json',
-)
+const questionsPath = fileURLToPath(new URL('../../../client/src/content/questions.json', import.meta.url))
 
 const expectedQuestions: CatalogQuestion[] = [
   { id: 'draw-likes', kind: 'text', prompt: 'אילו ציורים את אוהבת לצייר?' },

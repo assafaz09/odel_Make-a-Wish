@@ -32,22 +32,22 @@ const server = createServer(app)
 
 export default app
 
-server.on('error', (error: NodeJS.ErrnoException) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${config.port} is already in use.`)
-  } else {
-    console.error(error)
-  }
-  process.exit(1)
-})
+const runningOnVercel = process.env.VERCEL === '1'
 
 function shutdown(signal: NodeJS.Signals) {
   console.log(`Received ${signal}, shutting down`)
-  server.close(() => {
+  const done = () => {
     void closeMongo().finally(() => {
       process.exit(0)
     })
-  })
+  }
+
+  if (server.listening) {
+    server.close(done)
+    return
+  }
+
+  done()
 }
 
 process.on('SIGINT', () => {
@@ -58,6 +58,17 @@ process.on('SIGTERM', () => {
   shutdown('SIGTERM')
 })
 
-server.listen(config.port, '0.0.0.0', () => {
-  console.log(`API listening on http://localhost:${config.port}`)
-})
+if (!runningOnVercel) {
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${config.port} is already in use.`)
+    } else {
+      console.error(error)
+    }
+    process.exit(1)
+  })
+
+  server.listen(config.port, '0.0.0.0', () => {
+    console.log(`API listening on http://localhost:${config.port}`)
+  })
+}
