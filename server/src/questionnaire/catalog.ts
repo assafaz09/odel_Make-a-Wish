@@ -36,12 +36,12 @@ type CatalogQuestion = {
   prompt: string
 }
 
-const questionsPath = fileURLToPath(new URL('../../../client/src/content/questions.json', import.meta.url))
+const questionsPath = fileURLToPath(new URL('./questions.json', import.meta.url))
 
 const expectedQuestions: CatalogQuestion[] = [
   { id: 'draw-likes', kind: 'text', prompt: 'אילו ציורים את אוהבת לצייר?' },
   { id: 'drawing-file', kind: 'file', prompt: 'האם את יכולה לצרף קובץ של ציור?' },
-  { id: 'human-body', kind: 'yes-no', prompt: 'האם את יודעת לצייר גוף אדם?' },
+  { id: 'human-body', kind: 'yes-no', prompt: 'האם התנסית בציור גוף אומנותי?' },
   { id: 'fashion-sketch', kind: 'yes-no', prompt: 'האם התנסית בעבר בציור סקיצות של אופנה?' },
   { id: 'proportions', kind: 'choice', prompt: 'האם את מכירה את המושג ״פרופורציות״ בעיצוב?' },
 ]

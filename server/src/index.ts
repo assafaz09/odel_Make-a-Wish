@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { createApp } from './app.ts'
 import { loadConfig, type AppConfig } from './config.ts'
-import { closeMongo, connectMongo } from './db.ts'
+import { closeMongo } from './db.ts'
 
 function readConfig(): AppConfig {
   try {
@@ -15,15 +15,7 @@ function readConfig(): AppConfig {
 
 const config = readConfig()
 
-if (config.mongodbUri) {
-  try {
-    await connectMongo(config.mongodbUri, config.mongodbDbName)
-    console.log('Connected to MongoDB')
-  } catch (error) {
-    console.error('MongoDB connection failed. Questionnaire submissions will not be saved.')
-    console.error(error)
-  }
-} else {
+if (!config.mongodbUri) {
   console.log('MongoDB is not configured. Questionnaire submissions will not be saved.')
 }
 
@@ -50,15 +42,15 @@ function shutdown(signal: NodeJS.Signals) {
   done()
 }
 
-process.on('SIGINT', () => {
-  shutdown('SIGINT')
-})
-
-process.on('SIGTERM', () => {
-  shutdown('SIGTERM')
-})
-
 if (!runningOnVercel) {
+  process.on('SIGINT', () => {
+    shutdown('SIGINT')
+  })
+
+  process.on('SIGTERM', () => {
+    shutdown('SIGTERM')
+  })
+
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
       console.error(`Port ${config.port} is already in use.`)

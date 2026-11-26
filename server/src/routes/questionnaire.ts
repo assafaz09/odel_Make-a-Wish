@@ -2,7 +2,7 @@ import { ObjectId } from 'mongodb'
 import type { Express, Request, Response } from 'express'
 import { clearAdminCookie, isAdminRequest, passwordsMatch, setAdminCookie } from '../adminSession.ts'
 import type { AppConfig } from '../config.ts'
-import { getSubmissionsCollection, type SubmissionDocument } from '../db.ts'
+import { closeMongo, ensureMongo, type SubmissionDocument } from '../db.ts'
 import { normalizeSubmission, type StoredAnswers } from '../questionnaire/catalog.ts'
 
 const SAVING_UNAVAILABLE = { error: 'Saving is unavailable' }
@@ -12,7 +12,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
-async function createSubmission(req: Request, res: Response): Promise<void> {
+async function createSubmission(req: Request, res: Response, config: AppConfig): Promise<void> {
   if (!isRecord(req.body)) {
     res.status(400).json({ error: 'Invalid answers' })
     return
@@ -24,7 +24,7 @@ async function createSubmission(req: Request, res: Response): Promise<void> {
     return
   }
 
-  const collection = getSubmissionsCollection()
+  const collection = await ensureMongo(config.mongodbUri, config.mongodbDbName)
   if (!collection) {
     res.status(503).json(SAVING_UNAVAILABLE)
     return
@@ -38,6 +38,7 @@ async function createSubmission(req: Request, res: Response): Promise<void> {
     })
   } catch (error) {
     console.error(error)
+    await closeMongo()
     res.status(503).json(SAVING_UNAVAILABLE)
     return
   }
@@ -72,7 +73,7 @@ async function listSubmissions(req: Request, res: Response, config: AppConfig): 
     return
   }
 
-  const collection = getSubmissionsCollection()
+  const collection = await ensureMongo(config.mongodbUri, config.mongodbDbName)
   if (!collection) {
     res.status(503).json(SAVING_UNAVAILABLE)
     return
@@ -86,6 +87,7 @@ async function listSubmissions(req: Request, res: Response, config: AppConfig): 
     })
   } catch (error) {
     console.error(error)
+    await closeMongo()
     res.status(503).json(SAVING_UNAVAILABLE)
   }
 }
@@ -146,7 +148,7 @@ async function readDrawing(req: Request, res: Response, config: AppConfig): Prom
     return
   }
 
-  const collection = getSubmissionsCollection()
+  const collection = await ensureMongo(config.mongodbUri, config.mongodbDbName)
   if (!collection) {
     res.status(503).json(SAVING_UNAVAILABLE)
     return
@@ -173,7 +175,7 @@ async function readDrawing(req: Request, res: Response, config: AppConfig): Prom
 
 export function registerQuestionnaireRoutes(app: Express, config: AppConfig): void {
   app.post('/api/questionnaire/submissions', (req, res, next) => {
-    createSubmission(req, res).catch(next)
+    createSubmission(req, res, config).catch(next)
   })
 
   app.post('/api/admin/login', (req, res) => {
