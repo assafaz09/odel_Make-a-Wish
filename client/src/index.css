@@ -55,10 +55,6 @@ select {
   overflow-anchor: none;
 }
 
-.popup-runway--settled {
-  position: relative;
-}
-
 .popup-stage {
   position: sticky;
   top: 0;
@@ -71,12 +67,6 @@ select {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   background: #f4fcfd;
-}
-
-.popup-runway--settled .popup-stage {
-  position: absolute;
-  top: auto;
-  bottom: 0;
 }
 
 .popup-stack {

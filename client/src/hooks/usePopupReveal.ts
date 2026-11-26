@@ -55,7 +55,6 @@ export function usePopupReveal(count: number) {
       const cards = cardRefs.current
 
       if (reduced || count < 2 || metrics.stageHeight <= 0) {
-        runway.classList.remove('popup-runway--settled')
         for (let index = 0; index < count; index += 1) {
           const card = cards[index]
           if (!card) {
@@ -76,7 +75,6 @@ export function usePopupReveal(count: number) {
         return
       }
       settled = nextSettled
-      runway.classList.toggle('popup-runway--settled', nextSettled === 'after')
 
       const segment = metrics.travel / (count - 1)
       const traveled = clamp(raw, 0, metrics.travel)
