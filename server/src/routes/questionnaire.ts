@@ -7,6 +7,9 @@ import { normalizeSubmission, type StoredAnswers } from '../questionnaire/catalo
 
 const SAVING_UNAVAILABLE = { error: 'Saving is unavailable' }
 const ADMIN_UNAVAILABLE = { error: 'Admin login is not configured' }
+const INVALID_DELETE = { error: 'Invalid delete request' }
+const MAX_DELETE_IDS = 200
+const LIST_LIMIT = 200
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -80,7 +83,7 @@ async function listSubmissions(req: Request, res: Response, config: AppConfig): 
   }
 
   try {
-    const documents = await collection.find({}).sort({ createdAt: -1 }).limit(50).toArray()
+    const documents = await collection.find({}).sort({ createdAt: -1 }).limit(LIST_LIMIT).toArray()
     res.setHeader('Cache-Control', 'no-store')
     res.json({
       submissions: documents.map(toPublicSubmission),
@@ -173,6 +176,61 @@ async function readDrawing(req: Request, res: Response, config: AppConfig): Prom
   res.send(bytes)
 }
 
+async function deleteSubmissions(req: Request, res: Response, config: AppConfig): Promise<void> {
+  if (!config.adminPassword || !isAdminRequest(req, config.adminPassword)) {
+    res.status(401).json({ error: 'Unauthorized' })
+    return
+  }
+
+  if (!isRecord(req.body)) {
+    res.status(400).json(INVALID_DELETE)
+    return
+  }
+
+  const deleteAll = req.body.all === true
+  const hasIds = Object.prototype.hasOwnProperty.call(req.body, 'ids')
+  if (deleteAll === hasIds) {
+    res.status(400).json(INVALID_DELETE)
+    return
+  }
+
+  let filter: { _id?: { $in: ObjectId[] } } = {}
+  if (!deleteAll) {
+    const ids = req.body.ids
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_DELETE_IDS) {
+      res.status(400).json(INVALID_DELETE)
+      return
+    }
+
+    const objectIds: ObjectId[] = []
+    for (const id of ids) {
+      if (typeof id !== 'string' || !ObjectId.isValid(id)) {
+        res.status(400).json(INVALID_DELETE)
+        return
+      }
+
+      objectIds.push(new ObjectId(id))
+    }
+
+    filter = { _id: { $in: objectIds } }
+  }
+
+  const collection = await ensureMongo(config.mongodbUri, config.mongodbDbName)
+  if (!collection) {
+    res.status(503).json(SAVING_UNAVAILABLE)
+    return
+  }
+
+  try {
+    const result = await collection.deleteMany(filter)
+    res.json({ deleted: result.deletedCount })
+  } catch (error) {
+    console.error(error)
+    await closeMongo()
+    res.status(503).json(SAVING_UNAVAILABLE)
+  }
+}
+
 export function registerQuestionnaireRoutes(app: Express, config: AppConfig): void {
   app.post('/api/questionnaire/submissions', (req, res, next) => {
     createSubmission(req, res, config).catch(next)
@@ -184,6 +242,10 @@ export function registerQuestionnaireRoutes(app: Express, config: AppConfig): vo
 
   app.post('/api/admin/logout', (_req, res) => {
     logout(res, config)
+  })
+
+  app.post('/api/admin/submissions/delete', (req, res, next) => {
+    deleteSubmissions(req, res, config).catch(next)
   })
 
   app.get('/api/admin/submissions/:id/drawing', (req, res, next) => {

@@ -105,15 +105,17 @@ function isSubmission(value: unknown): value is Submission {
     return false
   }
 
-  const submission = value as { format?: unknown; answers?: unknown }
-  return (submission.format === 'current' || submission.format === 'legacy') && Boolean(submission.answers)
+  const submission = value as { id?: unknown; format?: unknown; answers?: unknown }
+  return typeof submission.id === 'string' && (submission.format === 'current' || submission.format === 'legacy') && Boolean(submission.answers)
 }
 
 export function AdminPage() {
   const [password, setPassword] = useState('')
   const [submissions, setSubmissions] = useState<Submission[] | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function loadSubmissions(): Promise<void> {
     const response = await fetch('/api/admin/submissions')
@@ -129,7 +131,10 @@ export function AdminPage() {
     }
 
     const body = (await response.json()) as { submissions?: unknown }
-    setSubmissions(Array.isArray(body.submissions) ? body.submissions.filter(isSubmission) : [])
+    const next = Array.isArray(body.submissions) ? body.submissions.filter(isSubmission) : []
+    const visible = new Set(next.map((submission) => submission.id))
+    setSubmissions(next)
+    setSelected((current) => new Set([...current].filter((id) => visible.has(id))))
     setError(null)
   }
 
@@ -160,6 +165,7 @@ export function AdminPage() {
         }
 
         setSubmissions(Array.isArray(body.submissions) ? body.submissions.filter(isSubmission) : [])
+        setSelected(new Set())
         setError(null)
       } catch {
         if (!cancelled) {
@@ -208,6 +214,93 @@ export function AdminPage() {
   async function logout(): Promise<void> {
     await fetch('/api/admin/logout', { method: 'POST' })
     setSubmissions(null)
+    setSelected(new Set())
+  }
+
+  function toggleSelected(id: string): void {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  function toggleAll(): void {
+    if (!submissions) {
+      return
+    }
+
+    const everyVisible = submissions.length > 0 && submissions.every((submission) => selected.has(submission.id))
+    setSelected(everyVisible ? new Set() : new Set(submissions.map((submission) => submission.id)))
+  }
+
+  async function removeSubmissions(body: { all: true } | { ids: string[] }, confirmed: boolean): Promise<void> {
+    if (!confirmed || deleting) {
+      return
+    }
+
+    setDeleting(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/admin/submissions/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (response.status === 401) {
+        setSubmissions(null)
+        setSelected(new Set())
+        setError('צריך להיכנס שוב.')
+        return
+      }
+
+      if (!response.ok) {
+        setError('לא הצלחנו למחוק את התשובות.')
+        return
+      }
+
+      const result = (await response.json()) as { deleted?: unknown }
+      const noneRemoved = result.deleted === 0 && 'ids' in body
+      await loadSubmissions()
+      if (noneRemoved) {
+        setError('הסבבים שסומנו כבר לא נמצאים.')
+      }
+    } catch {
+      setError('לא הצלחנו למחוק את התשובות.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  function deleteSelected(): void {
+    if (!submissions || selected.size === 0) {
+      return
+    }
+
+    const ids = submissions.filter((submission) => selected.has(submission.id)).map((submission) => submission.id)
+    if (ids.length === 0) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      ids.length === 1 ? 'למחוק את הסבב שסומן? אי אפשר לשחזר אותו.' : `למחוק ${ids.length} סבבים שסומנו? אי אפשר לשחזר אותם.`,
+    )
+    void removeSubmissions({ ids }, confirmed)
+  }
+
+  function deleteAll(): void {
+    if (!submissions || submissions.length === 0) {
+      return
+    }
+
+    const confirmed = window.confirm('למחוק את כל היסטוריית התשובות? אי אפשר לשחזר אותן.')
+    void removeSubmissions({ all: true }, confirmed)
   }
 
   return (
@@ -240,16 +333,40 @@ export function AdminPage() {
           <>
             <div className="admin-toolbar">
               <p>{submissions.length === 0 ? 'אין סבבים עדיין.' : `${submissions.length} סבבים, מהחדש לישן.`}</p>
-              <button className="admin-button admin-button--quiet" type="button" onClick={() => void logout()}>
-                יציאה
-              </button>
+              <div className="admin-toolbar__actions">
+                <button className="admin-button admin-button--quiet" type="button" disabled={deleting || submissions.length === 0} onClick={toggleAll}>
+                  {submissions.length > 0 && submissions.every((submission) => selected.has(submission.id)) ? 'בטל סימון' : 'סמן הכל'}
+                </button>
+                <button className="admin-button admin-button--danger" type="button" disabled={deleting || selected.size === 0} onClick={deleteSelected}>
+                  מחק מסומנים
+                </button>
+                <button className="admin-button admin-button--danger" type="button" disabled={deleting || submissions.length === 0} onClick={deleteAll}>
+                  מחק הכל
+                </button>
+                <button className="admin-button admin-button--quiet" type="button" disabled={deleting} onClick={() => void logout()}>
+                  יציאה
+                </button>
+              </div>
             </div>
             {error ? <p className="admin-error">{error}</p> : null}
             <div className="admin-list">
               {submissions.map((submission, index) => (
                 <article className="admin-card" key={submission.id}>
                   <header className="admin-card__header">
-                    <h2>סבב {submissions.length - index}</h2>
+                    <div className="admin-card__title">
+                      <label className="admin-select">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(submission.id)}
+                          disabled={deleting}
+                          aria-label={`סמן את סבב ${submissions.length - index}`}
+                          onChange={() => {
+                            toggleSelected(submission.id)
+                          }}
+                        />
+                      </label>
+                      <h2>סבב {submissions.length - index}</h2>
+                    </div>
                     <time dateTime={submission.createdAt ?? undefined}>{formatWhen(submission.createdAt)}</time>
                   </header>
                   {submission.format === 'legacy' ? (
